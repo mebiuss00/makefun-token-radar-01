@@ -1,11 +1,11 @@
-// Launch Radar (token-radar-01): a Node 22 program, standard library only.
+// Launch Radar, second build (token-radar-01): a Node 22 program, standard library only.
 //
 // It reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>), prices every
-// pre-token protocol with the peer-anchored model in lib/model.ts, writes the ranked board to
-// /output/board.json, writes the dashboard's dataset to /output/data.js, copies this repository's
-// dashboard/ and screenshots/ into /output, and finishes with /output/dossier.json, built by the
-// vendored make.fun library in vendor/makefun-board.ts. Run it twice and the bytes do not move:
-// nothing in the output depends on the clock, the network or the machine.
+// pre-token protocol with the evidence-graded peer model in lib/model.ts, writes the ranked
+// board to /output/board.json, writes the dashboard's dataset to /output/data.js, copies this
+// repository's dashboard/ and screenshots/ into /output, and finishes with /output/dossier.json,
+// built by the vendored make.fun library in vendor/makefun-board.ts. Run it twice and the bytes
+// do not move: nothing in the output depends on the clock, the network or the machine.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
@@ -74,7 +74,7 @@ if (!dashFiles.includes('index.html')) {
 }
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
 if (shots.length < 3 || shots.length > 4) {
-  process.stderr.write(`launch radar: screenshots/ holds ${shots.length} images: hand in 3 or 4 — the board, a detail view, a filtered view\n`);
+  process.stderr.write(`launch radar: screenshots/ holds ${shots.length} images: hand in 3 or 4 — the board, a detail view, a filtered view, the model\n`);
   process.exit(1);
 }
 for (const name of shots) {
@@ -90,8 +90,10 @@ writeFileSync(
   buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: DASHBOARD_CAPS }),
 );
 
+const graded = { A: 0, B: 0, C: 0 };
+for (const row of board) graded[row.evidence] += 1;
 process.stdout.write(
-  `launch radar: ${snapshot.protocols.length} protocols scanned, ${radar.counts.pre_token} record no token, ${radar.counts.live} already trade\n` +
-    `launch radar: board of ${board.length} rows (${snapshot.watchlist.length} watchlist + ${radar.counts.early} early), top row ${board[0]!.name} at $${board[0]!.implied_value_usd.toLocaleString('en-US')}\n` +
+  `launch radar: ${snapshot.protocols.length} protocols scanned, ${radar.counts.pre_token} record no token, ${radar.counts.live} already trade, ${radar.counts.aside} set aside as products\n` +
+    `launch radar: board of ${board.length} rows (${snapshot.watchlist.length} watchlist + ${radar.counts.early} early), evidence A ${graded.A} / B ${graded.B} / C ${graded.C}, top row ${board[0]!.name} at $${board[0]!.implied_value_usd.toLocaleString('en-US')}\n` +
     `launch radar: wrote board.json, data.js, dashboard/ (${dashFiles.length} files), screenshots/ (${shots.length} images) and dossier.json under ${out}\n`,
 );
