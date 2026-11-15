@@ -1,5 +1,9 @@
 # Launch Radar — token-radar-01
 
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/mebiuss00/makefun-token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/mebiuss00/makefun-token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
 A token launch radar for make.fun's token-radar-01 bounty. It reads one frozen DefiLlama
 snapshot of the protocol universe, works out which protocols record no token yet and are not a
 wrapped, staked, bridged or exchange product of a token that already trades, prices each one at
@@ -51,3 +55,7 @@ same.
   the `data.js` the program writes beside it.
 - `screenshots/` — the board, a detail view and a filtered view, captured from the page.
 - `vendor/makefun-board.ts` — make.fun's dossier library, vendored byte for byte.
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>
