@@ -1,73 +1,89 @@
-# Launch Radar — token-radar-01
-
 [![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![rank](https://make.fun/badge/token-radar-01/mebiuss00/makefun-token-radar-01/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![reward](https://make.fun/badge/token-radar-01/mebiuss00/makefun-token-radar-01/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
-A token launch radar for make.fun's token-radar-01 bounty, second build. It reads one frozen
-DefiLlama snapshot of the protocol universe, works out which protocols record no token yet and
-are not a wrapped, staked, bridged or exchange product of a token that already trades, prices
-each one at what a launch would be worth if its record froze today — with the evidence behind
-every price graded and printed — and hands in a dashboard: a radar scope of the whole board, a
-farm-first strip of the most valuable early rows, the ranked board with filters, a detail view
-per protocol with its pricing, its trading peers and its farm plan, the already-trading
-protocols set apart, every set-aside protocol listed with its reason, and the model itself.
+# Launch Radar — pre-token protocols, priced and ranked
 
-## The model (peer-anchor-2)
+Launch Radar reads one sealed snapshot of the protocol universe and ranks the protocols that
+record no token yet by what a launch would be worth if each protocol's record stayed exactly
+as the snapshot has it. Every price is anchored to the snapshot's own market: the protocols
+that already trade state, category by category, what the market pays for a dollar of TVL.
 
-Implied value is anchored to the snapshot's own market, never to a flat guess:
+The board is the product. The ranked table is the first thing on the page, under a lede that
+states the coverage plainly: how many protocols the snapshot holds, how many record no token,
+that every watchlist protocol is on the board, and how many more were set aside as products
+of tokens that already trade — each of those named, with its reason, on its own tab.
 
-- Every protocol that already trades contributes one observation: its market cap over its TVL,
-  **winsorised into [0.02, 5]** so one wild peer cannot bend a category.
-- A category's **multiple** is the median of those observations for the category, shrunk toward
-  the global median by 4 phantom peers and clamped to [0.04, 2.5].
-- **Growth** is asymmetric: a rising week is credited at 0.7% of value per point (capped at
-  +50), a falling week charged at 1% per point (floored at −50) — inflow is cheap to fake for
-  a week, outflow is not. **Maturity** saturates: 0.80 at birth rising toward 1.20 on a
-  900-day curve; a protocol whose start date is unlisted is aged at the snapshot's own median
-  tokenless age (513 days on this snapshot), computed from the file, not hardcoded.
-- Every price carries an **evidence grade** — A (eight or more trading peers whose ratios
-  agree), B (a priced category), C (thin evidence, including every price resting on one or
-  two peers) — from the peer count and the dispersion of the peer ratios.
+## The model — peer-anchor-3
 
-    implied = round( tvl x multiple(category) x growth x maturity )
+```
+multiple(category) = clamp( (n × median(peers) + 4 × global median) / (n + 4), ×0.04, ×2.50 )
+growth             = 1 + min(change_7d, +50) × 0.007    when the week rose
+                   = 1 + max(change_7d, −50) × 0.010    when the week fell
+maturity           = 0.80 + 0.40 × (1 − e^(−age_days / 900))
+implied value      = TVL × multiple × growth × maturity
+```
 
-One function prices every row; no protocol name is special-cased. The dashboard recomputes
-each row in the page and shows the same number, and its model panel prints the whole multiples
-table with the peer count, dispersion and grade behind every figure.
+- **The multiple.** A category's peers are its trading protocols; each gives one observation
+  of cap over TVL, winsorised into [×0.02, ×5.00] so one wild print cannot bend a category.
+  The multiple is the peer median shrunk toward the global median by four phantom peers: a
+  category priced from a single peer keeps one-fifth of that peer's voice, and a category
+  with no trading peer is priced at the global median itself.
+- **Peer support, printed not graded.** Every price states how many trading peers stand
+  behind its category, who the largest of them are and how far their ratios spread — in the
+  model panel's table, in each row's why-line and in its detail view. Thin support is handled
+  by the shrinkage itself rather than by a warning label: the fewer the peers, the more of
+  the price is the market-wide median.
+- **Growth, asymmetric.** A rising week is credited gently (+0.7% per point, capped at +50
+  points); a falling week is charged harder (−1.0% per point, floored at −50). A week of
+  inflow is cheap to fake; a week of outflow is not, so the model trusts declines more.
+- **Maturity, saturating.** Surviving tokenless compounds, then flattens: ×1.05 at 900 days,
+  ×1.18 at four years. A protocol whose start date the snapshot does not give is aged at the
+  median tokenless age of the snapshot's own pre-token protocols — computed from the file,
+  never a constant typed into the code.
+- **Separation.** Protocols that already trade are facts, not candidates: they sit on their
+  own tab at their real caps and never enter the ranking. Bridges, staking receipts, exchange
+  shelves and versioned pools are set aside with reasons, never ranked as launches.
 
-## The board
+Every row also carries a seven-step farm plan written for its own record — its chain, its
+family's core action, its capital sized from its TVL — and the plan's full price: capital
+plus estimated gas over the hold, computed by the same generator that writes the steps and
+printed as a plain price tag on the board and in the detail view.
 
-`board.json` holds 198 rows on this snapshot: the whole 40-protocol house watchlist (the
-floor, never the ceiling) plus 158 early protocols beyond it. Protocols whose token already
-trades are set aside, not ranked — the dashboard's "Already trading" view shows the largest
-40 with the market caps the multiples were priced from — and the 144 pre-token protocols that
-are products of tokens that already trade are listed one by one in the "Set aside" view, each
-with the reason it is not a launch candidate. Every row carries a seven-step farm plan derived
-from its own record (category family, chains, TVL band, age) and the plan's own price tag —
-capital, estimated gas, total, hold days — computed by the same generator that writes the
-steps, so the two can never disagree.
+## The dashboard
 
-## Run it
+A static page, no build step and no network: `data.js` carries the whole dataset, written by
+the same run that wrote `board.json`. Four tabs — the ranked board; the already-trading
+protocols at their real caps; the set-aside products with their reasons; and the model, with
+its formula, its constants and the multiples table. The board filters by text, category,
+chain, size band and momentum, shows the watchlist alone, and sorts by value, TVL, growth,
+age, multiple, peer count or plan cost. Every row opens to a detail view: the why-line, the
+arithmetic recomputed in the page from the row's own figures (it agrees with the board, or
+the page would show it), the trading peers it was priced from, and the farm plan with its
+cost broken out.
 
-    mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input <dir-or-file>
+Three screenshots ship with the entry: the board itself, one protocol's detail view, and a
+filtered view of the board — the three things a reader needs to judge the radar.
 
-Reads the snapshot (default `/input/snapshot.json`), writes `board.json`, `data.js`,
-`dashboard/`, `screenshots/` and `dossier.json` into the output directory. Node 22.18+,
-standard library only, no network. Run it twice on the same snapshot and every byte is the
-same.
+## Running it
+
+Node 22, standard library only:
+
+```
+node main.ts --input <snapshot.json>     # or mount the sealed input at /input
+```
+
+The run writes `board.json`, `data.js`, the dashboard and screenshots, and `dossier.json`
+into the output directory (`/output`, or `MAKEFUN_OUTPUT_DIR` outside the grader's
+container). It is deterministic: same snapshot in, same bytes out, on any machine.
 
 ## Layout
 
-- `main.ts` — the program: snapshot in, board + dashboard + dossier out.
-- `lib/model.ts` — the pricing model, the evidence grades, the board builder and the
-  farm-plan generator.
-- `dashboard/` — the static page (`index.html`, `app.css`, `app.js`); renders offline from
-  the `data.js` the program writes beside it.
-- `screenshots/` — the board, a detail view, a filtered view and the model view, captured
-  from the page.
-- `vendor/makefun-board.ts` — make.fun's dossier library, vendored byte for byte.
+- `main.ts` — the run: snapshot in, board and dossier out.
+- `lib/model.ts` — the pricing model, the farm-plan generator and the board builder.
+- `dashboard/` — the static page (HTML, CSS, JS) the dossier shows.
+- `screenshots/` — the board, a detail view, a filtered view.
+- `vendor/makefun-board.ts` — the vendored make.fun dossier library, byte-identical to the kit's.
 
 ---
-
 <sub>Entered on [make.fun](https://make.fun/?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>

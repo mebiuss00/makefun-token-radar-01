@@ -1,5 +1,7 @@
-// Launch Radar's second model: one sealed snapshot of the protocol universe in, one ranked
-// board out — with the evidence behind every price printed next to it.
+// Launch Radar's third model: one sealed snapshot of the protocol universe in, one ranked
+// board out — the peer-anchor pricing of the second build, presented the way the first
+// build presented it: the board first, every price's basis stated as plain counts and
+// named peers, and nothing on the page that the page cannot stand behind.
 //
 // The board ranks protocols that record no token yet by what a launch would be worth if the
 // protocol's record stayed exactly as the snapshot has it. The worth is anchored to the
@@ -17,14 +19,18 @@
 //   maturityMult       = 0.80 + 0.40 x (1 - e^(-age_days / 900))
 //   implied_value_usd  = max(1, round(tvl_usd x multiple x growthMult x maturityMult))
 //
-// Three things v2 adds over a bare price. First, an evidence grade per row: the category's
-// peer count and the dispersion of its peer ratios (interquartile range over median), graded
-// A, B or C, so a price resting on one peer is labelled as resting on one peer. Second, the
-// unknown-age fallback is not a constant: it is the median tokenless age of the snapshot's own
-// pre-token protocols whose start date is known, computed from the file at run time. Third,
-// every row carries the cost of its own farm plan (capital plus estimated gas over the hold),
-// so the page can divide the model's claim by the plan's price and rank farming efficiency
-// beside raw value. No protocol name is ever special-cased: one function prices every row,
+// What the third build changes is presentation, not arithmetic — the second build's prices
+// stand. Its letter grades are gone: a grade stamped on a price told the reader to doubt
+// the board's own top rows, when the honest facts are stronger than any letter — how many
+// trading peers price the category, who the largest of them are, and how far their ratios
+// spread. Those facts are printed, per category in the model panel and per row in its
+// detail view, and the shrinkage above is what a thin category actually gets: a price
+// resting on one peer is pulled four-fifths of the way to the global median before it is
+// printed. The unknown-age fallback is still not a constant: it is the median tokenless
+// age of the snapshot's own pre-token protocols whose start date is known, computed from
+// the file at run time. Every row still carries the cost of its own farm plan — capital
+// plus estimated gas over the hold — printed as a plain price tag, never divided into the
+// model's claim. No protocol name is ever special-cased: one function prices every row,
 // and the page recomputes each row from the same figures, so board and code cannot drift.
 
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
@@ -82,16 +88,13 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label, named in the dashboard and the board. */
-export const MODEL_VERSION = 'peer-anchor-2';
+export const MODEL_VERSION = 'peer-anchor-3';
 
 /** The board's size cap: every rankable pre-token protocol, strongest first, up to this many. */
 export const BOARD_MAX = 400;
 
 /** How many live-token protocols the dashboard's Already-trading view sets aside, by cap. */
 export const LIVE_ROWS = 40;
-
-/** An evidence grade: A prices from many agreeing peers, C from a thin or scattered set. */
-export type EvidenceGrade = 'A' | 'B' | 'C';
 
 /** One trading protocol a category's multiple was priced from, named for the detail view. */
 export interface PeerExample {
@@ -102,14 +105,13 @@ export interface PeerExample {
   ratio: number;
 }
 
-/** One category's pricing: the multiple used, and the evidence it stands on. */
+/** One category's pricing: the multiple used, and the peer support it stands on. */
 export interface CategoryMultiple {
   category: string;
   multiple: number;
   peers: number;
   peer_median: number | null;
   dispersion: number | null;
-  grade: EvidenceGrade;
   top_peers: PeerExample[];
 }
 
@@ -135,7 +137,6 @@ export interface BoardRow {
   age_days: number | null;
   watchlist: boolean;
   implied_value_usd: number;
-  evidence: EvidenceGrade;
   why: string;
   model: {
     multiple: number;
@@ -289,19 +290,6 @@ const clampMultiple = (n: number, model: ModelConstants): number =>
 const winsor = (ratio: number, model: ModelConstants): number =>
   Math.min(model.ratio_cap, Math.max(model.ratio_floor, ratio));
 
-/**
- * The evidence grade a category's price earns: A when at least eight trading peers agree
- * (dispersion at most 1.25), B when at least three peers price it and they do not scatter
- * past 2.5, C otherwise — including every price that rests on one or two peers, however
- * tidy those peers look. Dispersion is the interquartile range of the winsorised peer
- * ratios over their median, and is only quoted when four or more peers make it meaningful.
- */
-export function evidenceGrade(peers: number, dispersion: number | null): EvidenceGrade {
-  if (peers >= 8 && dispersion !== null && dispersion <= 1.25) return 'A';
-  if (peers >= 3 && (dispersion === null || dispersion <= 2.5)) return 'B';
-  return 'C';
-}
-
 /** The pricing context one snapshot produces: the multiples table and the derived age fallback. */
 export interface Pricing {
   asOf: string;
@@ -313,9 +301,13 @@ export interface Pricing {
 /**
  * The pricing table, derived only from the snapshot's token-bearing protocols. Peer ratios
  * are winsorised before any statistic touches them; a category's multiple is its peer median
- * shrunk toward the global median by phantom peers, so a thin category cannot shout. The
- * unknown-age fallback is the median known tokenless age across the snapshot's pre-token
- * protocols — the file's own answer to "how old is a protocol whose start date is missing".
+ * shrunk toward the global median by phantom peers, so a thin category cannot shout — a
+ * category priced from a single peer keeps only a fifth of that peer's voice. The unknown-age
+ * fallback is the median known tokenless age across the snapshot's pre-token protocols — the
+ * file's own answer to "how old is a protocol whose start date is missing". Each category
+ * also keeps its peer count, the dispersion of its peer ratios (interquartile range over
+ * median, quoted only when four or more peers make it meaningful) and its largest peers by
+ * market cap, so the page can print the support behind every multiple instead of grading it.
  */
 export function buildPricing(snapshot: Snapshot, model: ModelConstants = MODEL): Pricing {
   const ratiosByCategory = new Map<string, number[]>();
@@ -346,7 +338,7 @@ export function buildPricing(snapshot: Snapshot, model: ModelConstants = MODEL):
       .sort((a, b) => b.mcap_usd - a.mcap_usd || (a.slug < b.slug ? -1 : 1))
       .slice(0, 4);
     if (ratios.length === 0) {
-      table.set(category, { category, multiple: round4(clampMultiple(global, model)), peers: 0, peer_median: null, dispersion: null, grade: 'C', top_peers: [] });
+      table.set(category, { category, multiple: round4(clampMultiple(global, model)), peers: 0, peer_median: null, dispersion: null, top_peers: [] });
       continue;
     }
     const peerMedian = median(ratios);
@@ -360,7 +352,6 @@ export function buildPricing(snapshot: Snapshot, model: ModelConstants = MODEL):
       peers: ratios.length,
       peer_median: round4(peerMedian),
       dispersion,
-      grade: evidenceGrade(ratios.length, dispersion),
       top_peers: topPeers,
     });
   }
@@ -386,7 +377,7 @@ export function maturityFactor(ageDaysCount: number, model: ModelConstants = MOD
   return model.maturity_base + model.maturity_range * (1 - Math.exp(-Math.max(0, ageDaysCount) / model.maturity_tau_days));
 }
 
-/** The three factors, the evidence and the implied value one protocol gets under `pricing`. */
+/** The three factors, the peer support and the implied value one protocol gets under `pricing`. */
 export function impliedValue(
   p: SnapshotProtocol,
   pricing: Pricing,
@@ -397,7 +388,6 @@ export function impliedValue(
   peers: number;
   peerMedian: number | null;
   dispersion: number | null;
-  grade: EvidenceGrade;
   growthMult: number;
   maturityMult: number;
   age: number | null;
@@ -413,7 +403,6 @@ export function impliedValue(
     peers: entry.peers,
     peerMedian: entry.peer_median,
     dispersion: entry.dispersion,
-    grade: entry.grade,
     growthMult,
     maturityMult,
     age,
@@ -423,12 +412,12 @@ export function impliedValue(
 /** One sentence that says why a row sits where it sits, with the three drivers quantified. */
 export function whyLine(
   p: SnapshotProtocol,
-  v: { multiple: number; peers: number; grade: EvidenceGrade; growthMult: number; maturityMult: number; age: number | null },
+  v: { multiple: number; peers: number; growthMult: number; maturityMult: number; age: number | null },
 ): string {
   const category = p.category ?? 'Uncategorised';
   const peerPart = v.peers === 0
-    ? `priced at x${v.multiple.toFixed(2)}, the global median, because no ${category} protocol trades yet (evidence C)`
-    : `priced at x${v.multiple.toFixed(2)}, the shrunk median of ${v.peers} trading ${category} peer${v.peers === 1 ? '' : 's'} (evidence ${v.grade})`;
+    ? `priced at x${v.multiple.toFixed(2)}, the global median multiple, because no ${category} protocol trades yet`
+    : `priced at x${v.multiple.toFixed(2)}, the shrunk median of ${v.peers} trading ${category} peer${v.peers === 1 ? '' : 's'}`;
   const growthPart = p.change_7d === null
     ? 'no seven-day change on record, so momentum is neutral'
     : `a ${p.change_7d >= 0 ? '+' : ''}${round2(p.change_7d)}% week in TVL moves the price ${v.growthMult >= 1 ? '+' : ''}${Math.round((v.growthMult - 1) * 100)}%`;
@@ -700,7 +689,6 @@ export function buildBoard(snapshot: Snapshot, pricing: Pricing, model: ModelCon
     age_days: s.v.age,
     watchlist: watch.has(s.p.slug),
     implied_value_usd: s.v.implied,
-    evidence: s.v.grade,
     why: whyLine(s.p, s.v),
     model: {
       multiple: s.v.multiple,
